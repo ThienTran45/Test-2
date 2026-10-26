@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coming Soon</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #1b1740; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; image-rendering: pixelated; image-rendering: crisp-edges; }
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Coming soon"></canvas>
+<script>
+(() => {
+  const cv = document.getElementById('c');
+  const ctx = cv.getContext('2d');
+  let W, H, SCALE, stars, flies, reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // 5x7 pixel font
+  const FONT = {
+    C: ['01110','10001','10000','10000','10000','10001','01110'],
+    O: ['01110','10001','10001','10001','10001','10001','01110'],
+    M: ['10001','11011','10101','10101','10001','10001','10001'],
+    I: ['01110','00100','00100','00100','00100','00100','01110'],
+    N: ['10001','11001','10101','10011','10001','10001','10001'],
+    G: ['01110','10001','10000','10111','10001','10001','01111'],
+    S: ['01111','10000','10000','01110','00001','00001','11110'],
+  };
+
+  const RABBIT = [
+    '..ww....ww..',
+    '.wwp....pww.',
+    '.wwp....pww.',
+    '.wwp....pww.',
+    '..wwwwwwww..',
+    '.wwwwwwwwww.',
+    '.wkkwwwwkkw.',
+    '.wkkwwwwkkw.',
+    '.wwwwppwwww.',
+    '..wwwwwwww..',
+    '.wwwwwwwwww.',
+    'wwwwwwwwwwww',
+    'wwwwwwwwwwtt',
+    'wwwwwwwwwwtt',
+    '.wwssssssww.',
+    '..ww....ww..',
+  ];
+  const RABBIT_COLORS = { w: '#f6eefb', p: '#f4a7c3', k: '#2a1f4a', s: '#d9c9ee', t: '#ffffff' };
+
+  const CARROT = [
+    '..gg..',
+    '.gGg..',
+    '..oo..',
+    '.ooOo.',
+    '.oOoo.',
+    '..oO..',
+    '..o...',
+  ];
+  const CARROT_COLORS = { g: '#7fd67a', G: '#4faa5c', o: '#ff9a4a', O: '#e06a2c' };
+
+  const px = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), w, h); };
+
+  function sprite(map, colors, x, y, s = 1) {
+    map.forEach((row, j) => [...row].forEach((ch, i) => {
+      if (colors[ch]) px(x + i * s, y + j * s, s, s, colors[ch]);
+    }));
+  }
+
+  function resize() {
+    SCALE = Math.max(3, Math.round(innerHeight / 180));
+    W = Math.ceil(innerWidth / SCALE);
+    H = Math.ceil(innerHeight / SCALE);
+    cv.width = W; cv.height = H;
+    const rnd = mulberry(7);
+    stars = Array.from({ length: Math.round(W * H / 420) }, () => ({
+      x: Math.floor(rnd() * W), y: Math.floor(rnd() * H * 0.6),
+      p: rnd() * 6.28, big: rnd() > 0.85,
+    }));
+    flies = Array.from({ length: 9 }, () => ({
+      x: rnd() * W, y: H * (0.6 + rnd() * 0.3), p: rnd() * 6.28, sp: 0.4 + rnd() * 0.6,
+    }));
+  }
+
+  function mulberry(a) {
+    return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  }
+
+  function sky() {
+    const bands = ['#16123a','#1b1745','#221b50','#2a2059','#322661','#3b2c69','#463371','#533b78','#62447e','#734e83','#865a87'];
+    const bh = Math.ceil(H * 0.75 / bands.length);
+    bands.forEach((c, i) => px(0, i * bh, W, bh + 1, c));
+    px(0, bh * bands.length, W, H, '#865a87');
+  }
+
+  function moon(t) {
+    const cx = Math.round(W * 0.74), cy = Math.round(H * 0.19), r = Math.round(Math.min(W, H) * 0.1);
+    for (const [k, a] of [[2.2, 0.06], [1.7, 0.09], [1.35, 0.13]]) {
+      ctx.globalAlpha = a + (reduceMotion ? 0 : Math.sin(t * 0.8) * 0.015);
+      disc(cx, cy, Math.round(r * k), '#ffe9a8');
+    }
+    ctx.globalAlpha = 1;
+    disc(cx, cy, r, '#fff1c4');
+    disc(cx + 1, cy + 1, r - 2, '#ffe9a8');
+    disc(cx - 2, cy - 2, r - 4, '#fff6d6');
+    for (const [dx, dy, cr] of [[-0.35, -0.2, 0.2], [0.3, 0.1, 0.25], [-0.1, 0.45, 0.15]])
+      disc(cx + Math.round(dx * r), cy + Math.round(dy * r), Math.max(2, Math.round(cr * r)), '#f1d98f');
+  }
+
+  function disc(cx, cy, r, c) {
+    ctx.fillStyle = c;
+    for (let y = -r; y <= r; y++) {
+      const w = Math.floor(Math.sqrt(r * r - y * y));
+      ctx.fillRect(cx - w, cy + y, w * 2 + 1, 1);
+    }
+  }
+
+  function hills() {
+    const layers = [
+      { base: 0.78, amp: 0.05, f: 0.018, ph: 0, c: '#4a3a7c' },
+      { base: 0.86, amp: 0.045, f: 0.026, ph: 2, c: '#33295f' },
+      { base: 0.94, amp: 0.03, f: 0.035, ph: 4, c: '#211b45' },
+    ];
+    layers.forEach(l => {
+      for (let x = 0; x < W; x++) {
+        const y = Math.round(H * (l.base + Math.sin(x * l.f + l.ph) * l.amp + Math.sin(x * l.f * 2.3 + l.ph) * l.amp * 0.4));
+        px(x, y, 1, H - y, l.c);
+      }
+    });
+  }
+
+  function bitmapText(str, x, y, s, color, shadow) {
+    let cx = x;
+    for (const ch of str) {
+      if (ch === ' ') { cx += 4 * s; continue; }
+      FONT[ch].forEach((row, j) => [...row].forEach((b, i) => {
+        if (b === '1') {
+          px(cx + i * s, y + j * s + s, s, s, shadow);
+          px(cx + i * s, y + j * s, s, s, color);
+        }
+      }));
+      cx += 6 * s;
+    }
+  }
+  const textWidth = (str, s) => [...str].reduce((a, ch) => a + (ch === ' ' ? 4 : 6) * s, 0) - s;
+
+  function title(t) {
+    // gentle blink: alpha drifts between ~0.55 and 1, with a soft slow pulse
+    const a = reduceMotion ? 1 : 0.78 + Math.sin(t * 2.4) * 0.22;
+    const s = W >= 230 ? 3 : 2;
+    const lines = W >= 230 ? ['COMING SOON'] : ['COMING', 'SOON'];
+    const lh = 7 * s + 4 * s;
+    const top = Math.round(H * 0.46 - (lines.length * lh) / 2);
+    lines.forEach((line, i) => {
+      const w = textWidth(line, s), x = Math.round((W - w) / 2), y = top + i * lh;
+      ctx.globalAlpha = a;
+      bitmapText(line, x, y, s, '#fff6d6', '#e07a5f');
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  function scene(t) {
+    sky();
+    stars.forEach(s => {
+      const tw = reduceMotion ? 1 : (Math.sin(t * 1.6 + s.p) + 1) / 2;
+      ctx.globalAlpha = 0.35 + tw * 0.65;
+      px(s.x, s.y, 1, 1, '#fffbe6');
+      if (s.big && tw > 0.5) { px(s.x - 1, s.y, 3, 1, '#fffbe6'); px(s.x, s.y - 1, 1, 3, '#fffbe6'); }
+    });
+    ctx.globalAlpha = 1;
+    moon(t);
+    hills();
+    // grass tufts
+    const rnd = mulberry(3);
+    for (let i = 0; i < W / 6; i++) {
+      const x = Math.floor(rnd() * W), y = Math.floor(H * (0.9 + rnd() * 0.09));
+      px(x, y, 1, 2, '#3f6b5a'); px(x + 1, y + 1, 1, 1, '#3f6b5a');
+    }
+    // Tsuki rabbit gazing at the moon, with a carrot
+    const rs = 2, rx = Math.round(W * 0.2), ry = Math.round(H * 0.9) - 16 * rs;
+    const bob = reduceMotion ? 0 : (Math.sin(t * 1.5) > 0.9 ? -1 : 0);
+    sprite(RABBIT, RABBIT_COLORS, rx, ry + bob, rs);
+    sprite(CARROT, CARROT_COLORS, rx + 12 * rs + 4, ry + 16 * rs - 7 * 2, 2);
+    // fireflies
+    flies.forEach(f => {
+      const x = f.x + Math.sin(t * f.sp + f.p) * 6, y = f.y + Math.cos(t * f.sp * 1.3 + f.p) * 4;
+      const on = reduceMotion ? 1 : (Math.sin(t * 2 + f.p * 3) + 1) / 2;
+      ctx.globalAlpha = 0.2 + on * 0.8;
+      px(x, y, 1, 1, '#d8ff7a');
+      ctx.globalAlpha = on * 0.25;
+      px(x - 1, y, 3, 1, '#d8ff7a'); px(x, y - 1, 1, 3, '#d8ff7a');
+    });
+    ctx.globalAlpha = 1;
+    title(t);
+  }
+
+  let last = 0;
+  function frame(ms) {
+    if (ms - last > 33) { last = ms; scene(ms / 1000); }
+    requestAnimationFrame(frame);
+  }
+  addEventListener('resize', resize);
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
